@@ -53,7 +53,7 @@ const (
 	CharSet = "UTF-8"
 )
 
-func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) {
+func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse, error) {
 	fmt.Printf("ctx: %+v\n", ctx)
 	fmt.Printf("request: %+v\n", request)
 
@@ -117,11 +117,13 @@ func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) {
 			fmt.Println(err.Error())
 		}
 
-		return
+		return nil, err
 	}
 
 	fmt.Println("Email Sent to address: " + Recipient)
 	fmt.Println(result)
+
+	return &events.APIGatewayProxyResponse{Body: "ok", StatusCode: 200}, nil
 }
 
 func main() {
