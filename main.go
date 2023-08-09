@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	//go get -u github.com/aws/aws-sdk-go
 	"github.com/aws/aws-sdk-go/aws"
@@ -31,31 +32,83 @@ const (
 	// The subject line for the email.
 	Subject = "Form Submitted - graphnetworks.com.au"
 
-	// The HTML body for the email.
-	HtmlBody = `
-	The following details have been submitted via <a href="https://graphnetworks.com.au/">https://graphnetworks.com.au/</a>
-	<br/>
-	<br/>
-	Name: John Doe
-	<br/>
-	Company Name: ABC Company
-	<br/>
-	Company Industry: IT
-	<br/>
-	Email Address: ABC Bulding CDE
-	<br/>
-	Phone Number: 000000000000
-	<br/>
-	Message: Message body
-	`
-
 	// The character encoding for the email.
 	CharSet = "UTF-8"
 )
 
+type Payload struct {
+	Name            string
+	CompanyName     string
+	CompanyIndustry string
+	EmailAddress    string
+	PhoneNumber     string
+	Message         string
+}
+
+func validateMethod(request events.APIGatewayProxyRequest) error {
+	// TODO:
+	return nil
+}
+
+func validatePath(request events.APIGatewayProxyRequest) error {
+	// TODO:
+	return nil
+}
+
+func getPayload(request events.APIGatewayProxyRequest) (Payload, error) {
+	// TODO:
+	return Payload{}, nil
+}
+
+func constructBody(payload Payload) string {
+	body := `
+	The following details have been submitted via <a href="https://graphnetworks.com.au/">https://graphnetworks.com.au/</a>
+	<br/>
+	<br/>
+	Name: {name}
+	<br/>
+	Company Name: {companyName}
+	<br/>
+	Company Industry: {companyIndustry}
+	<br/>
+	Email Address: {emailAddress}
+	<br/>
+	Phone Number: {phoneNumber}
+	<br/>
+	Message: {message}
+	`
+
+	body += strings.ReplaceAll(body, "{name}", payload.Name)
+	body += strings.ReplaceAll(body, "{companyName}", payload.CompanyName)
+	body += strings.ReplaceAll(body, "{companyIndustry}", payload.CompanyIndustry)
+	body += strings.ReplaceAll(body, "{emailAddress}", payload.EmailAddress)
+	body += strings.ReplaceAll(body, "{phoneNumber}", payload.PhoneNumber)
+	body += strings.ReplaceAll(body, "{message}", payload.Message)
+
+	return body
+}
+
 func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse, error) {
 	fmt.Printf("ctx: %+v\n", ctx)
 	fmt.Printf("request: %+v\n", request)
+
+	if err := validateMethod(request); err != nil {
+		fmt.Println(err.Error())
+		return &events.APIGatewayProxyResponse{Body: "page not found", StatusCode: 404}, nil
+	}
+
+	if err := validatePath(request); err != nil {
+		fmt.Println(err.Error())
+		return &events.APIGatewayProxyResponse{Body: "page not found", StatusCode: 404}, nil
+	}
+
+	payload, err := getPayload(request)
+	if err != nil {
+		fmt.Println(err.Error())
+		return &events.APIGatewayProxyResponse{Body: "bad request", StatusCode: 400}, nil
+	}
+
+	htmlBody := constructBody(payload)
 
 	// Create a new session in the us-west-2 region.
 	// Replace us-west-2 with the AWS Region you're using for Amazon SES.
@@ -82,7 +135,7 @@ func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 			Body: &ses.Body{
 				Html: &ses.Content{
 					Charset: aws.String(CharSet),
-					Data:    aws.String(HtmlBody),
+					Data:    aws.String(htmlBody),
 				},
 			},
 			Subject: &ses.Content{
@@ -117,7 +170,7 @@ func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 			fmt.Println(err.Error())
 		}
 
-		return nil, err
+		return &events.APIGatewayProxyResponse{Body: fmt.Sprintf("unable to send email. %s", err.Error()), StatusCode: 400}, nil
 	}
 
 	fmt.Println("Email Sent to address: " + Recipient)
