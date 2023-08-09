@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -9,6 +10,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ses"
+
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
 )
 
 const (
@@ -49,7 +53,10 @@ const (
 	CharSet = "UTF-8"
 )
 
-func main() {
+func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) {
+	fmt.Printf("ctx: %+v\n", ctx)
+	fmt.Printf("request: %+v\n", request)
+
 	// Create a new session in the us-west-2 region.
 	// Replace us-west-2 with the AWS Region you're using for Amazon SES.
 	sess, err := session.NewSession(&aws.Config{
@@ -115,4 +122,8 @@ func main() {
 
 	fmt.Println("Email Sent to address: " + Recipient)
 	fmt.Println(result)
+}
+
+func main() {
+	lambda.Start(handleRequest)
 }
