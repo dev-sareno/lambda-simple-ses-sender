@@ -23,18 +23,18 @@ import (
 const (
 	// Replace sender@example.com with your "From" address.
 	// This address must be verified with Amazon SES.
-	DefaultSender = "noreply@graphnetworks.com.au"
+	DefaultSender = "noreply@example.com"
 
 	// Replace recipient@example.com with a "To" address. If your account
 	// is still in the sandbox, this address must be verified.
-	DefaultRecipient = "info@graphnetworks.com.au"
+	DefaultRecipient = "info@example.com"
 
 	// Specify a configuration set. To use a configuration
 	// set, comment the next line and line 92.
 	//ConfigurationSet = "ConfigSet"
 
 	// The subject line for the email.
-	DefaultSubject = "Form Submitted - graphnetworks.com.au"
+	DefaultSubject = "Form Submitted - example.com"
 
 	// The character encoding for the email.
 	CharSet = "UTF-8"
@@ -92,7 +92,7 @@ func getPayload(request events.APIGatewayV2HTTPRequest) (Payload, error) {
 
 func constructBody(payload Payload) string {
 	body := `
-	The following details have been submitted via <a href="https://graphnetworks.com.au/">https://graphnetworks.com.au/</a>
+	The following details have been submitted via <a href="https://example.com/">https://example.com/</a>
 	<br/>
 	<br/>
 	Name: {name}
