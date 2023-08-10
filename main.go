@@ -2,8 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	//go get -u github.com/aws/aws-sdk-go
@@ -19,45 +23,71 @@ import (
 const (
 	// Replace sender@example.com with your "From" address.
 	// This address must be verified with Amazon SES.
-	Sender = "noreply@graphnetworks.com.au"
+	DefaultSender = "noreply@graphnetworks.com.au"
 
 	// Replace recipient@example.com with a "To" address. If your account
 	// is still in the sandbox, this address must be verified.
-	Recipient = "hpo.sareno@gmail.com"
+	DefaultRecipient = "info@graphnetworks.com.au"
 
 	// Specify a configuration set. To use a configuration
 	// set, comment the next line and line 92.
 	//ConfigurationSet = "ConfigSet"
 
 	// The subject line for the email.
-	Subject = "Form Submitted - graphnetworks.com.au"
+	DefaultSubject = "Form Submitted - graphnetworks.com.au"
 
 	// The character encoding for the email.
 	CharSet = "UTF-8"
 )
 
 type Payload struct {
-	Name            string
-	CompanyName     string
-	CompanyIndustry string
-	EmailAddress    string
-	PhoneNumber     string
-	Message         string
+	Name            string `json:"name"`
+	CompanyName     string `json:"companyName" binding:"required"`
+	CompanyIndustry string `json:"companyIndustry" binding:"required"`
+	EmailAddress    string `json:"emailAddress" binding:"required"`
+	PhoneNumber     string `json:"phoneNumber" binding:"required"`
+	Message         string `json:"message"`
 }
 
-func validateMethod(request events.APIGatewayProxyRequest) error {
-	// TODO:
+func validateMethod(request events.APIGatewayV2HTTPRequest) error {
+	method := request.RequestContext.HTTP.Method
+	if method != "POST" {
+		return fmt.Errorf("POST method is expected, got %s", method)
+	}
 	return nil
 }
 
-func validatePath(request events.APIGatewayProxyRequest) error {
-	// TODO:
+func validatePath(request events.APIGatewayV2HTTPRequest) error {
+	if request.RawPath != "/submit" && request.RawPath != "/submit/" {
+		return fmt.Errorf("/submit path is expected, got %s", request.RawPath)
+	}
 	return nil
 }
 
-func getPayload(request events.APIGatewayProxyRequest) (Payload, error) {
-	// TODO:
-	return Payload{}, nil
+func getPayload(request events.APIGatewayV2HTTPRequest) (Payload, error) {
+	result := Payload{}
+	body := request.Body
+
+	// validate content type
+	if request.Headers["content-type"] != "application/json" {
+		return result, errors.New("invalid content type or body")
+	}
+
+	if request.IsBase64Encoded {
+		// decode base64
+		data, err := base64.StdEncoding.DecodeString(request.Body)
+		if err != nil {
+			return result, fmt.Errorf("unable to decode body. %s", err.Error())
+		}
+		body = string(data)
+	}
+
+	// decode json
+	if err := json.Unmarshal([]byte(body), &result); err != nil {
+		return result, fmt.Errorf("unable to unmarshall json. %s", err.Error())
+	}
+
+	return result, nil
 }
 
 func constructBody(payload Payload) string {
@@ -78,37 +108,45 @@ func constructBody(payload Payload) string {
 	Message: {message}
 	`
 
-	body += strings.ReplaceAll(body, "{name}", payload.Name)
-	body += strings.ReplaceAll(body, "{companyName}", payload.CompanyName)
-	body += strings.ReplaceAll(body, "{companyIndustry}", payload.CompanyIndustry)
-	body += strings.ReplaceAll(body, "{emailAddress}", payload.EmailAddress)
-	body += strings.ReplaceAll(body, "{phoneNumber}", payload.PhoneNumber)
-	body += strings.ReplaceAll(body, "{message}", payload.Message)
+	// check if set via env variable
+	envEmailTemplate := os.Getenv("EMAIL_TEMPLATE")
+	if envEmailTemplate != "" {
+		body = envEmailTemplate
+	}
+
+	body = strings.ReplaceAll(body, "{name}", payload.Name)
+	body = strings.ReplaceAll(body, "{companyName}", payload.CompanyName)
+	body = strings.ReplaceAll(body, "{companyIndustry}", payload.CompanyIndustry)
+	body = strings.ReplaceAll(body, "{emailAddress}", payload.EmailAddress)
+	body = strings.ReplaceAll(body, "{phoneNumber}", payload.PhoneNumber)
+	body = strings.ReplaceAll(body, "{message}", payload.Message)
 
 	return body
 }
 
-func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse, error) {
-	fmt.Printf("ctx: %+v\n", ctx)
-	fmt.Printf("request: %+v\n", request)
+func isAuthenticated(request events.APIGatewayV2HTTPRequest) bool {
+	return os.Getenv("AUTHTOKEN") == request.Headers["x-authtoken"]
+}
 
-	if err := validateMethod(request); err != nil {
-		fmt.Println(err.Error())
-		return &events.APIGatewayProxyResponse{Body: "page not found", StatusCode: 404}, nil
+func sendEmail(content string) *events.APIGatewayProxyResponse {
+	// read env variables
+	recipient := DefaultRecipient
+	envRecipient := os.Getenv("EMAIL_RECIPIENT")
+	if envRecipient != "" {
+		recipient = envRecipient
 	}
 
-	if err := validatePath(request); err != nil {
-		fmt.Println(err.Error())
-		return &events.APIGatewayProxyResponse{Body: "page not found", StatusCode: 404}, nil
+	subject := DefaultSubject
+	envSubject := os.Getenv("EMAIL_SUBJECT")
+	if envSubject != "" {
+		subject = envSubject
 	}
 
-	payload, err := getPayload(request)
-	if err != nil {
-		fmt.Println(err.Error())
-		return &events.APIGatewayProxyResponse{Body: "bad request", StatusCode: 400}, nil
+	sender := DefaultSender
+	envSender := os.Getenv("EMAIL_SENDER")
+	if envSender != "" {
+		sender = envSender
 	}
-
-	htmlBody := constructBody(payload)
 
 	// Create a new session in the us-west-2 region.
 	// Replace us-west-2 with the AWS Region you're using for Amazon SES.
@@ -128,22 +166,22 @@ func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		Destination: &ses.Destination{
 			CcAddresses: []*string{},
 			ToAddresses: []*string{
-				aws.String(Recipient),
+				aws.String(recipient),
 			},
 		},
 		Message: &ses.Message{
 			Body: &ses.Body{
 				Html: &ses.Content{
 					Charset: aws.String(CharSet),
-					Data:    aws.String(htmlBody),
+					Data:    aws.String(content),
 				},
 			},
 			Subject: &ses.Content{
 				Charset: aws.String(CharSet),
-				Data:    aws.String(Subject),
+				Data:    aws.String(subject),
 			},
 		},
-		Source: aws.String(Sender),
+		Source: aws.String(sender),
 		// Uncomment to use a configuration set
 		//ConfigurationSetName: aws.String(ConfigurationSet),
 	}
@@ -170,11 +208,43 @@ func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 			fmt.Println(err.Error())
 		}
 
-		return &events.APIGatewayProxyResponse{Body: fmt.Sprintf("unable to send email. %s", err.Error()), StatusCode: 400}, nil
+		return &events.APIGatewayProxyResponse{Body: fmt.Sprintf("unable to send email. %s", err.Error()), StatusCode: 400}
 	}
 
-	fmt.Println("Email Sent to address: " + Recipient)
+	fmt.Println("Email Sent to address: " + recipient)
 	fmt.Println(result)
+	return nil
+}
+
+func handleRequest(ctx context.Context, request events.APIGatewayV2HTTPRequest) (*events.APIGatewayProxyResponse, error) {
+	fmt.Printf("ctx: %+v\n", ctx)
+	fmt.Printf("request: %+v\n", request)
+
+	if !isAuthenticated(request) {
+		return &events.APIGatewayProxyResponse{Body: "unauthorized", StatusCode: 401}, nil
+	}
+
+	if err := validateMethod(request); err != nil {
+		fmt.Println(err.Error())
+		return &events.APIGatewayProxyResponse{Body: "page not found", StatusCode: 404}, nil
+	}
+
+	if err := validatePath(request); err != nil {
+		fmt.Println(err.Error())
+		return &events.APIGatewayProxyResponse{Body: "page not found", StatusCode: 404}, nil
+	}
+
+	payload, err := getPayload(request)
+	if err != nil {
+		fmt.Println(err.Error())
+		return &events.APIGatewayProxyResponse{Body: "bad request", StatusCode: 400}, nil
+	}
+
+	htmlBody := constructBody(payload)
+
+	if errorResponse := sendEmail(htmlBody); errorResponse != nil {
+		return errorResponse, nil
+	}
 
 	return &events.APIGatewayProxyResponse{Body: "ok", StatusCode: 200}, nil
 }
