@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -50,14 +49,14 @@ type Payload struct {
 
 func validateMethod(request events.APIGatewayProxyRequest) error {
 	if strings.ToUpper(request.HTTPMethod) != "POST" {
-		return errors.New("POST method is expected")
+		return fmt.Errorf("POST method is expected, got %s", request.HTTPMethod)
 	}
 	return nil
 }
 
 func validatePath(request events.APIGatewayProxyRequest) error {
 	if request.Path != "/submit" {
-		return errors.New("/submit path is expected")
+		return fmt.Errorf("/submit path is expected, got %s", request.Path)
 	}
 	return nil
 }
