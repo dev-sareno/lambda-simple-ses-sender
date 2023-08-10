@@ -39,12 +39,12 @@ const (
 )
 
 type Payload struct {
-	Name            string `json:"name" binding:"required"`
+	Name            string `json:"name"`
 	CompanyName     string `json:"companyName" binding:"required"`
 	CompanyIndustry string `json:"companyIndustry" binding:"required"`
 	EmailAddress    string `json:"emailAddress" binding:"required"`
 	PhoneNumber     string `json:"phoneNumber" binding:"required"`
-	Message         string `json:"message" binding:"required"`
+	Message         string `json:"message"`
 }
 
 func validateMethod(request events.APIGatewayV2HTTPRequest) error {
@@ -101,12 +101,12 @@ func constructBody(payload Payload) string {
 	Message: {message}
 	`
 
-	body += strings.ReplaceAll(body, "{name}", payload.Name)
-	body += strings.ReplaceAll(body, "{companyName}", payload.CompanyName)
-	body += strings.ReplaceAll(body, "{companyIndustry}", payload.CompanyIndustry)
-	body += strings.ReplaceAll(body, "{emailAddress}", payload.EmailAddress)
-	body += strings.ReplaceAll(body, "{phoneNumber}", payload.PhoneNumber)
-	body += strings.ReplaceAll(body, "{message}", payload.Message)
+	body = strings.ReplaceAll(body, "{name}", payload.Name)
+	body = strings.ReplaceAll(body, "{companyName}", payload.CompanyName)
+	body = strings.ReplaceAll(body, "{companyIndustry}", payload.CompanyIndustry)
+	body = strings.ReplaceAll(body, "{emailAddress}", payload.EmailAddress)
+	body = strings.ReplaceAll(body, "{phoneNumber}", payload.PhoneNumber)
+	body = strings.ReplaceAll(body, "{message}", payload.Message)
 
 	return body
 }
