@@ -47,21 +47,22 @@ type Payload struct {
 	Message         string `json:"message" binding:"required"`
 }
 
-func validateMethod(request events.APIGatewayProxyRequest) error {
-	if strings.ToUpper(request.HTTPMethod) != "POST" {
-		return fmt.Errorf("POST method is expected, got %s", request.HTTPMethod)
+func validateMethod(request events.APIGatewayV2HTTPRequest) error {
+	method := request.RequestContext.HTTP.Method
+	if method != "POST" {
+		return fmt.Errorf("POST method is expected, got %s", method)
 	}
 	return nil
 }
 
-func validatePath(request events.APIGatewayProxyRequest) error {
-	if request.Path != "/submit" {
-		return fmt.Errorf("/submit path is expected, got %s", request.Path)
+func validatePath(request events.APIGatewayV2HTTPRequest) error {
+	if request.RawPath != "/submit" {
+		return fmt.Errorf("/submit path is expected, got %s", request.RawPath)
 	}
 	return nil
 }
 
-func getPayload(request events.APIGatewayProxyRequest) (Payload, error) {
+func getPayload(request events.APIGatewayV2HTTPRequest) (Payload, error) {
 	result := Payload{}
 	body := request.Body
 
@@ -110,7 +111,7 @@ func constructBody(payload Payload) string {
 	return body
 }
 
-func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse, error) {
+func handleRequest(ctx context.Context, request events.APIGatewayV2HTTPRequest) (*events.APIGatewayProxyResponse, error) {
 	fmt.Printf("ctx: %+v\n", ctx)
 	fmt.Printf("request: %+v\n", request)
 
