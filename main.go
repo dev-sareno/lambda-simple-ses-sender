@@ -23,18 +23,18 @@ import (
 const (
 	// Replace sender@example.com with your "From" address.
 	// This address must be verified with Amazon SES.
-	Sender = "noreply@graphnetworks.com.au"
+	DefaultSender = "noreply@graphnetworks.com.au"
 
 	// Replace recipient@example.com with a "To" address. If your account
 	// is still in the sandbox, this address must be verified.
-	Recipient = "hpo.sareno@gmail.com"
+	DefaultRecipient = "info@graphnetworks.com.au"
 
 	// Specify a configuration set. To use a configuration
 	// set, comment the next line and line 92.
 	//ConfigurationSet = "ConfigSet"
 
 	// The subject line for the email.
-	Subject = "Form Submitted - graphnetworks.com.au"
+	DefaultSubject = "Form Submitted - graphnetworks.com.au"
 
 	// The character encoding for the email.
 	CharSet = "UTF-8"
@@ -129,6 +129,25 @@ func isAuthenticated(request events.APIGatewayV2HTTPRequest) bool {
 }
 
 func sendEmail(content string) *events.APIGatewayProxyResponse {
+	// read env variables
+	recipient := DefaultRecipient
+	envRecipient := os.Getenv("EMAIL_RECIPIENT")
+	if envRecipient != "" {
+		recipient = envRecipient
+	}
+
+	subject := DefaultSubject
+	envSubject := os.Getenv("EMAIL_SUBJECT")
+	if envSubject != "" {
+		subject = envSubject
+	}
+
+	sender := DefaultSender
+	envSender := os.Getenv("EMAIL_SENDER")
+	if envSender != "" {
+		sender = envSender
+	}
+
 	// Create a new session in the us-west-2 region.
 	// Replace us-west-2 with the AWS Region you're using for Amazon SES.
 	sess, err := session.NewSession(&aws.Config{
@@ -147,7 +166,7 @@ func sendEmail(content string) *events.APIGatewayProxyResponse {
 		Destination: &ses.Destination{
 			CcAddresses: []*string{},
 			ToAddresses: []*string{
-				aws.String(Recipient),
+				aws.String(recipient),
 			},
 		},
 		Message: &ses.Message{
@@ -159,10 +178,10 @@ func sendEmail(content string) *events.APIGatewayProxyResponse {
 			},
 			Subject: &ses.Content{
 				Charset: aws.String(CharSet),
-				Data:    aws.String(Subject),
+				Data:    aws.String(subject),
 			},
 		},
-		Source: aws.String(Sender),
+		Source: aws.String(sender),
 		// Uncomment to use a configuration set
 		//ConfigurationSetName: aws.String(ConfigurationSet),
 	}
@@ -192,7 +211,7 @@ func sendEmail(content string) *events.APIGatewayProxyResponse {
 		return &events.APIGatewayProxyResponse{Body: fmt.Sprintf("unable to send email. %s", err.Error()), StatusCode: 400}
 	}
 
-	fmt.Println("Email Sent to address: " + Recipient)
+	fmt.Println("Email Sent to address: " + recipient)
 	fmt.Println(result)
 	return nil
 }
