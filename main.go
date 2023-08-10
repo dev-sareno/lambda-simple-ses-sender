@@ -56,7 +56,7 @@ func validateMethod(request events.APIGatewayV2HTTPRequest) error {
 }
 
 func validatePath(request events.APIGatewayV2HTTPRequest) error {
-	if request.RawPath != "/submit" {
+	if request.RawPath != "/submit" && request.RawPath != "/submit/" {
 		return fmt.Errorf("/submit path is expected, got %s", request.RawPath)
 	}
 	return nil
