@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	//go get -u github.com/aws/aws-sdk-go
@@ -117,9 +118,17 @@ func constructBody(payload Payload) string {
 	return body
 }
 
+func isAuthenticated(request events.APIGatewayV2HTTPRequest) bool {
+	return os.Getenv("AUTHTOKEN") == request.Headers["x-authtoken"]
+}
+
 func handleRequest(ctx context.Context, request events.APIGatewayV2HTTPRequest) (*events.APIGatewayProxyResponse, error) {
 	fmt.Printf("ctx: %+v\n", ctx)
 	fmt.Printf("request: %+v\n", request)
+
+	if !isAuthenticated(request) {
+		return &events.APIGatewayProxyResponse{Body: "unauthorized", StatusCode: 401}, nil
+	}
 
 	if err := validateMethod(request); err != nil {
 		fmt.Println(err.Error())
