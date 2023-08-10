@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -65,6 +66,11 @@ func validatePath(request events.APIGatewayV2HTTPRequest) error {
 func getPayload(request events.APIGatewayV2HTTPRequest) (Payload, error) {
 	result := Payload{}
 	body := request.Body
+
+	// validate content type
+	if request.Headers["content-type"] != "application/json" {
+		return result, errors.New("invalid content type or body")
+	}
 
 	if request.IsBase64Encoded {
 		// decode base64
