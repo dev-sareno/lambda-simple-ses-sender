@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -46,18 +49,38 @@ type Payload struct {
 }
 
 func validateMethod(request events.APIGatewayProxyRequest) error {
-	// TODO:
+	if strings.ToUpper(request.HTTPMethod) != "POST" {
+		return errors.New("POST method is expected")
+	}
 	return nil
 }
 
 func validatePath(request events.APIGatewayProxyRequest) error {
-	// TODO:
+	if request.Path != "/submit" {
+		return errors.New("/submit path is expected")
+	}
 	return nil
 }
 
 func getPayload(request events.APIGatewayProxyRequest) (Payload, error) {
-	// TODO:
-	return Payload{}, nil
+	result := Payload{}
+	body := request.Body
+
+	if request.IsBase64Encoded {
+		// decode base64
+		data, err := base64.StdEncoding.DecodeString(request.Body)
+		if err != nil {
+			return result, fmt.Errorf("unable to decode body. %s", err.Error())
+		}
+		body = string(data)
+	}
+
+	// decode json
+	if err := json.Unmarshal([]byte(body), &result); err != nil {
+		return result, fmt.Errorf("unable to unmarshall json. %s", err.Error())
+	}
+
+	return result, nil
 }
 
 func constructBody(payload Payload) string {
