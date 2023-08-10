@@ -108,6 +108,12 @@ func constructBody(payload Payload) string {
 	Message: {message}
 	`
 
+	// check if set via env variable
+	envEmailTemplate := os.Getenv("EMAIL_TEMPLATE")
+	if envEmailTemplate != "" {
+		body = envEmailTemplate
+	}
+
 	body = strings.ReplaceAll(body, "{name}", payload.Name)
 	body = strings.ReplaceAll(body, "{companyName}", payload.CompanyName)
 	body = strings.ReplaceAll(body, "{companyIndustry}", payload.CompanyIndustry)
@@ -122,32 +128,7 @@ func isAuthenticated(request events.APIGatewayV2HTTPRequest) bool {
 	return os.Getenv("AUTHTOKEN") == request.Headers["x-authtoken"]
 }
 
-func handleRequest(ctx context.Context, request events.APIGatewayV2HTTPRequest) (*events.APIGatewayProxyResponse, error) {
-	fmt.Printf("ctx: %+v\n", ctx)
-	fmt.Printf("request: %+v\n", request)
-
-	if !isAuthenticated(request) {
-		return &events.APIGatewayProxyResponse{Body: "unauthorized", StatusCode: 401}, nil
-	}
-
-	if err := validateMethod(request); err != nil {
-		fmt.Println(err.Error())
-		return &events.APIGatewayProxyResponse{Body: "page not found", StatusCode: 404}, nil
-	}
-
-	if err := validatePath(request); err != nil {
-		fmt.Println(err.Error())
-		return &events.APIGatewayProxyResponse{Body: "page not found", StatusCode: 404}, nil
-	}
-
-	payload, err := getPayload(request)
-	if err != nil {
-		fmt.Println(err.Error())
-		return &events.APIGatewayProxyResponse{Body: "bad request", StatusCode: 400}, nil
-	}
-
-	htmlBody := constructBody(payload)
-
+func sendEmail(content string) *events.APIGatewayProxyResponse {
 	// Create a new session in the us-west-2 region.
 	// Replace us-west-2 with the AWS Region you're using for Amazon SES.
 	sess, err := session.NewSession(&aws.Config{
@@ -173,7 +154,7 @@ func handleRequest(ctx context.Context, request events.APIGatewayV2HTTPRequest) 
 			Body: &ses.Body{
 				Html: &ses.Content{
 					Charset: aws.String(CharSet),
-					Data:    aws.String(htmlBody),
+					Data:    aws.String(content),
 				},
 			},
 			Subject: &ses.Content{
@@ -208,11 +189,43 @@ func handleRequest(ctx context.Context, request events.APIGatewayV2HTTPRequest) 
 			fmt.Println(err.Error())
 		}
 
-		return &events.APIGatewayProxyResponse{Body: fmt.Sprintf("unable to send email. %s", err.Error()), StatusCode: 400}, nil
+		return &events.APIGatewayProxyResponse{Body: fmt.Sprintf("unable to send email. %s", err.Error()), StatusCode: 400}
 	}
 
 	fmt.Println("Email Sent to address: " + Recipient)
 	fmt.Println(result)
+	return nil
+}
+
+func handleRequest(ctx context.Context, request events.APIGatewayV2HTTPRequest) (*events.APIGatewayProxyResponse, error) {
+	fmt.Printf("ctx: %+v\n", ctx)
+	fmt.Printf("request: %+v\n", request)
+
+	if !isAuthenticated(request) {
+		return &events.APIGatewayProxyResponse{Body: "unauthorized", StatusCode: 401}, nil
+	}
+
+	if err := validateMethod(request); err != nil {
+		fmt.Println(err.Error())
+		return &events.APIGatewayProxyResponse{Body: "page not found", StatusCode: 404}, nil
+	}
+
+	if err := validatePath(request); err != nil {
+		fmt.Println(err.Error())
+		return &events.APIGatewayProxyResponse{Body: "page not found", StatusCode: 404}, nil
+	}
+
+	payload, err := getPayload(request)
+	if err != nil {
+		fmt.Println(err.Error())
+		return &events.APIGatewayProxyResponse{Body: "bad request", StatusCode: 400}, nil
+	}
+
+	htmlBody := constructBody(payload)
+
+	if errorResponse := sendEmail(htmlBody); errorResponse != nil {
+		return errorResponse, nil
+	}
 
 	return &events.APIGatewayProxyResponse{Body: "ok", StatusCode: 200}, nil
 }
