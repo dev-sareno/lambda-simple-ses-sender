@@ -40,12 +40,12 @@ const (
 )
 
 type Payload struct {
-	Name            string
-	CompanyName     string
-	CompanyIndustry string
-	EmailAddress    string
-	PhoneNumber     string
-	Message         string
+	Name            string `json:"name" binding:"required"`
+	CompanyName     string `json:"companyName" binding:"required"`
+	CompanyIndustry string `json:"companyIndustry" binding:"required"`
+	EmailAddress    string `json:"emailAddress" binding:"required"`
+	PhoneNumber     string `json:"phoneNumber" binding:"required"`
+	Message         string `json:"message" binding:"required"`
 }
 
 func validateMethod(request events.APIGatewayProxyRequest) error {
